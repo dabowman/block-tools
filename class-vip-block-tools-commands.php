@@ -204,6 +204,43 @@ if ( ! class_exists( 'VIP_Block_Tools_Commands' ) ) {
 			}
 			WP_CLI::success( "Removed '{$block_slug}' block from all specified post types in site {$site_id}." );
 		}
+
+		/**
+		 * Audits the contents of a specified post type and outputs a list of all blocks used.
+		 *
+		 * --post-type      The type of the posts to audit. Defaults to 'post'. (optional)
+		 *
+		 * @param array $args        The arguments.
+		 * @param array $assoc_args  The associative arguments.
+		 */
+		public function audit( $args, $assoc_args ) {
+			$post_type = isset( $assoc_args['post-type'] ) ? $assoc_args['post-type'] : 'post';
+			$posts     = get_posts(
+				array(
+					'post_type'      => $post_type,
+					'posts_per_page' => -1,
+				)
+			);
+			if ( empty( $posts ) ) {
+				WP_CLI::error( 'No posts found for the specified post type.' );
+				return;
+			}
+			$unique_blocks = array(); // Array to store unique block names/slugs
+			foreach ( $posts as $post ) {
+				$blocks = parse_blocks( $post->post_content ); // Parse the block content
+				foreach ( $blocks as $block ) {
+					$block_name = $block['blockName']; // Get the block name/slug
+					if ( ! in_array( $block_name, $unique_blocks ) ) {
+						$unique_blocks[] = $block_name; // Add the block name/slug to the array if it's not already present
+					}
+				}
+			}
+			// Output the list of used blocks
+			WP_CLI::line( 'List of used blocks:' );
+			foreach ( $unique_blocks as $block_slug ) {
+				WP_CLI::line( $block_slug );
+			}
+		}
 	}
 }
 
