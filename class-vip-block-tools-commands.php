@@ -206,7 +206,21 @@ if ( ! class_exists( 'VIP_Block_Tools_Commands' ) ) {
 		}
 
 		/**
-		 * Audits the contents of a specified post type and outputs a list of all blocks used.
+		 * Get the query arguments for WP_Query.
+		 *
+		 * @param string $post_type The post type to query.
+		 * @return array The query arguments.
+		 */
+		private function get_query_args( $post_type ) {
+			return array(
+				'post_type'      => $post_type,
+				'posts_per_page' => 100, // Set the number of posts to process per page,
+				'offset'         => 0, // Start from the first post
+			);
+		}
+
+		/**
+		 * Audits the contents of a specified post type and outputs a list of all unique blocks used.
 		 *
 		 * --post-type      The type of the posts to audit. Defaults to 'post'. (optional)
 		 *
@@ -215,29 +229,33 @@ if ( ! class_exists( 'VIP_Block_Tools_Commands' ) ) {
 		 */
 		public function audit( $args, $assoc_args ) {
 			$post_type = isset( $assoc_args['post-type'] ) ? $assoc_args['post-type'] : 'post';
-			$posts     = get_posts(
-				array(
-					'post_type'      => $post_type,
-					'posts_per_page' => -1,
-				)
-			);
-			if ( empty( $posts ) ) {
+			$query_args = $this->get_query_args( $post_type );
+			$query = new WP_Query( $query_args );
+			if ( ! $query->have_posts() ) {
 				WP_CLI::error( 'No posts found for the specified post type.' );
 				return;
 			}
 			$unique_blocks = array(); // Array to store unique block names/slugs
-			foreach ( $posts as $post ) {
-				$blocks = parse_blocks( $post->post_content ); // Parse the block content
+			$total_found_posts = $query->found_posts; // Total number of posts found
+			$total_processed_posts = 0; // Total number of posts processed
+			$progress = \WP_CLI\Utils\make_progress_bar( 'Auditing posts', $total_found_posts );
+			while ( $query->have_posts() ) {
+				$query->the_post();
+				$blocks = parse_blocks( get_the_content() ); // Parse the block content
 				foreach ( $blocks as $block ) {
-					$block_name = $block['blockName']; // Get the block name/slug
-					if ( ! in_array( $block_name, $unique_blocks ) ) {
-						$unique_blocks[] = $block_name; // Add the block name/slug to the array if it's not already present
+					if ( isset( $block['blockName'] ) && ! empty( $block['blockName'] ) ) {
+						$block_name = $block['blockName']; // Get the block name/slug
+						$unique_blocks[ $block_name ] = true; // Add the block name/slug as a key in the associative array
 					}
 				}
+				$total_processed_posts++; // Increment the total number of processed posts
+				$progress->tick(); // Update the progress bar
 			}
+			$progress->finish(); // Finish the progress bar
+			wp_reset_postdata();
 			// Output the list of used blocks
 			WP_CLI::line( 'List of used blocks:' );
-			foreach ( $unique_blocks as $block_slug ) {
+			foreach ( array_keys( $unique_blocks ) as $block_slug ) {
 				WP_CLI::line( $block_slug );
 			}
 		}
