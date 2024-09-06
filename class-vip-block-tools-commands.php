@@ -206,20 +206,6 @@ if ( ! class_exists( 'VIP_Block_Tools_Commands' ) ) {
 		}
 
 		/**
-		 * Get the query arguments for WP_Query.
-		 *
-		 * @param string $post_type The post type to query.
-		 * @return array The query arguments.
-		 */
-		private function get_query_args( $post_type ) {
-			return array(
-				'post_type'      => $post_type,
-				'posts_per_page' => 100, // Set the number of posts to process per page,
-				'offset'         => 0, // Start from the first post
-			);
-		}
-
-		/**
 		 * Audits the contents of a specified post type and outputs a list of all unique blocks used.
 		 *
 		 * --post-type      The type of the posts to audit. Defaults to 'post'. (optional)
@@ -229,34 +215,65 @@ if ( ! class_exists( 'VIP_Block_Tools_Commands' ) ) {
 		 */
 		public function audit( $args, $assoc_args ) {
 			$post_type = isset( $assoc_args['post-type'] ) ? $assoc_args['post-type'] : 'post';
-			$query_args = $this->get_query_args( $post_type );
-			$query = new WP_Query( $query_args );
-			if ( ! $query->have_posts() ) {
-				WP_CLI::error( 'No posts found for the specified post type.' );
-				return;
-			}
 			$unique_blocks = array(); // Array to store unique block names/slugs
-			$total_found_posts = $query->found_posts; // Total number of posts found
+			$total_found_posts = 0; // Total number of posts found will be calculated
 			$total_processed_posts = 0; // Total number of posts processed
-			$progress = \WP_CLI\Utils\make_progress_bar( 'Auditing posts', $total_found_posts );
-			while ( $query->have_posts() ) {
-				$query->the_post();
-				$blocks = parse_blocks( get_the_content() ); // Parse the block content
-				foreach ( $blocks as $block ) {
-					if ( isset( $block['blockName'] ) && ! empty( $block['blockName'] ) ) {
-						$block_name = $block['blockName']; // Get the block name/slug
-						$unique_blocks[ $block_name ] = true; // Add the block name/slug as a key in the associative array
-					}
-				}
-				$total_processed_posts++; // Increment the total number of processed posts
-				$progress->tick(); // Update the progress bar
+
+			if ( 'all' === $post_type ) {
+				$post_types = get_post_types( array( 'public' => true ), 'names' );
+				$additional_post_types = array( 'wp_block', 'wp_template', 'wp_template_part' );
+				$post_types = array_unique( array_merge( $post_types, $additional_post_types ) );
+			} else {
+				$post_types = array( $post_type );
 			}
-			$progress->finish(); // Finish the progress bar
-			wp_reset_postdata();
+			foreach ( $post_types as $type ) {
+				$query_args = $this->get_query_args( $type );
+				$query = new WP_Query( $query_args );
+
+				if ( ! $query->have_posts() ) {
+					WP_CLI::line( "No posts found for post type: $type." );
+					continue;
+				}
+
+				$progress = \WP_CLI\Utils\make_progress_bar( "Auditing posts for post type: $type", $query->found_posts );
+
+				while ( $query->have_posts() ) {
+					$query->the_post();
+					$blocks = parse_blocks( get_the_content() ); // Parse the block content
+					$this->process_blocks( $blocks, $unique_blocks );
+					$total_processed_posts++; // Increment the total number of processed posts
+					$progress->tick(); // Update the progress bar
+				}
+
+				$progress->finish(); // Finish the progress bar
+				wp_reset_postdata();
+			}
+
 			// Output the list of used blocks
+			WP_CLI::line( 'Total posts processed: ' . $total_processed_posts );
 			WP_CLI::line( 'List of used blocks:' );
 			foreach ( array_keys( $unique_blocks ) as $block_slug ) {
 				WP_CLI::line( $block_slug );
+			}
+		}
+
+		private function get_query_args( $post_type ) {
+			return array(
+				'post_type'      => $post_type,
+				'posts_per_page' => 100, // Set the number of posts to process per page,
+				'offset'         => 0, // Start from the first post
+			);
+		}
+
+		private function process_blocks( $blocks, &$unique_blocks ) {
+			foreach ( $blocks as $block ) {
+				if ( isset( $block['blockName'] ) && ! empty( $block['blockName'] ) ) {
+					$block_name = $block['blockName'];
+					$unique_blocks[ $block_name ] = true;
+				}
+				if ( ! empty( $block['innerBlocks'] ) ) {
+					$this->process_blocks( $block['innerBlocks'], $unique_blocks );
+				}
 			}
 		}
 	}
