@@ -18,6 +18,7 @@ if ( ! class_exists( 'VIP_Block_Tools_Commands' ) ) {
 		public function __construct() {
 			WP_CLI::add_command( 'block-tools search', array( $this, 'search' ) );
 			WP_CLI::add_command( 'block-tools remove', array( $this, 'remove' ) );
+			WP_CLI::add_command( 'block-tools audit', array( $this, 'audit' ) );
 		}
 
 		/**
