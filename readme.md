@@ -36,6 +36,18 @@ Removes a specific Gutenberg block from your WordPress posts.
 ```bash
 wp block-tools remove --block-slug=paragraph --site-id=1 --post-type=post,page
 ```
+### `wp block-tools audit`
+
+Scans posts of a specified post type or all post types and lists every unique block that has been used.
+
+#### Parameters
+
+- `--post-type=<slug>`: (optional) The slug of the post type you want to audit or `all` which will scan all post types as well as 'wp_block', 'wp_template' and 'wp_template_part'. Defaults to `post`.
+
+#### Usage
+
+`wp block-tools audit [--post-type=<post-type>]`
+
 
 ## Installation
 
