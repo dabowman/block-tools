@@ -1,12 +1,12 @@
 # Block Tools Commands
 
-This WordPress plugin provides two WP-CLI commands for managing Gutenberg blocks in your WordPress installation.
+This WordPress plugin provides useful WP-CLI commands for managing Gutenberg blocks.
 
 ## Commands
 
 ### `wp block-tools search`
 
-Searches for a specific Gutenberg block in your WordPress posts.
+Searches for every instance of a specific Gutenberg block in your WordPress database.
 
 #### Parameters
 
@@ -46,8 +46,9 @@ Scans posts of a specified post type or all post types and lists every unique bl
 
 #### Usage
 
-`wp block-tools audit [--post-type=<post-type>]`
-
+```bash
+wp block-tools audit --post-type=all
+```
 
 ## Installation
 
